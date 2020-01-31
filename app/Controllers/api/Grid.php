@@ -17,7 +17,7 @@ class Grid extends BaseController
 
   public function __construct()
   {
-    $this->db =& Database::connect();
+//    $this->db =& Database::connect();
 //    $this->wolfModel = new WolfModel($db);
   }
 

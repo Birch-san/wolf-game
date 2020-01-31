@@ -7,16 +7,22 @@ use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\Database\ConnectionInterface;
 use Config\Database;
 
-class WolfView {
-//  /** @var string */
-//  public $id;
+class HunterView {
   /** @var string */
   public $name;
   public function __construct(
-//    string $id,
     string $name
   ) {
-//    $this->id = $id;
+    $this->name = $name;
+  }
+}
+
+class WolfView {
+  /** @var string */
+  public $name;
+  public function __construct(
+    string $name
+  ) {
     $this->name = $name;
   }
 }
@@ -24,11 +30,16 @@ class WolfView {
 class GetWorldResponse {
   /** @var WolfView[] */
   public $wolves;
+  public $hunters;
 
-  /** @param WolfView[] $wolves */
-  public function __construct(array $wolves)
+  /**
+   * @param WolfView[] $wolves
+   * @param HunterView[] $hunters
+   */
+  public function __construct(array $wolves, array $hunters)
   {
     $this->wolves = $wolves;
+    $this->hunters = $hunters;
   }
 }
 
@@ -51,6 +62,10 @@ class World extends BaseController
   {
     return $this->respond(new GetWorldResponse([
       'abc' => new WolfView(
+        'Woolf'
+      )
+    ], [
+      '123' => new HunterView(
         'Barry'
       )
     ]));

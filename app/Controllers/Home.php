@@ -27,11 +27,6 @@ class Home extends BaseController
     return $wolf->name;
 	}
 
-  public function grid()
-  {
-    return $this->respond([[1,0],[0,1]]);
-  }
-
 	//--------------------------------------------------------------------
 
 }
