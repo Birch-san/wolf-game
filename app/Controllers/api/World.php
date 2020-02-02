@@ -6,6 +6,7 @@ namespace App\Controllers\Api;
 use App\Controllers\BaseController;
 use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\Database\ConnectionInterface;
+use CodeIgniter\Exceptions\PageNotFoundException;
 use Config\Database;
 
 class Position {
@@ -101,6 +102,30 @@ class World extends BaseController
   {
     $this->db =& Database::connect();
 //    $this->wolfModel = new WolfModel($db);
+  }
+
+  public function _remap(string $method, string ...$params) {
+    if (method_exists($this, $method))
+    {
+      switch($method) {
+        /** @noinspection PhpMissingBreakStatementInspection */
+        case 'room':
+          if (count($params) > 1) {
+            switch($params[2]) {
+              case 'update':
+              return $this->updateWorld(...array_slice($params, 1));
+            }
+          }
+        default:
+        return $this->$method(...$params);
+      }
+    }
+    throw PageNotFoundException::forPageNotFound();
+  }
+
+  private function updateWorld(string $room)
+  {
+    return $this->respond($room);
   }
 
 	public function room(string $room)
