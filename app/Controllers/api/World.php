@@ -111,9 +111,9 @@ class World extends BaseController
         /** @noinspection PhpMissingBreakStatementInspection */
         case 'room':
           if (count($params) > 1) {
-            switch($params[2]) {
+            switch($params[1]) {
               case 'update':
-              return $this->updateWorld(...array_slice($params, 1));
+              return $this->updateWorld($params[0]);
             }
           }
         default:
@@ -128,7 +128,7 @@ class World extends BaseController
     return $this->respond($room);
   }
 
-	public function room(string $room)
+  public function room(string $room)
   {
     return $this->respond(new GetWorldResponse([
       'abc' => new WolfView(
