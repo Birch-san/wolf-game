@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Entities\RoomUser;
 use App\Models\RoomModel;
 use App\Models\RoomUserModel;
 use App\Models\UserModel;
@@ -14,6 +15,7 @@ use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
 use Exception;
+use IdGenerator;
 
 class JoinRoomResponse {
   /** @var string */
@@ -71,19 +73,29 @@ class Room extends BaseController
   {
     $this->db->transBegin();
     $this->db->transStrict(false);
+    $now = new Time();
     /** @var \App\Entities\Room|null $room */
     $room = $this->roomModel->find($name);
     if (is_null($room)) {
       $room = new \App\Entities\Room();
       $room->name = $name;
-      $room->last_updated = new Time();
+      $room->last_updated = $now;
       $this->roomModel->insert($room);
     }
-//    $id = IdGenerator::generateId();
-//    $user = $this->userModel->find()
     $userId = (string) $this->session->get('id');
-
-//    $this->roomUserModel->
+    /** @var RoomUser|null $roomUser */
+    $roomUser = $this->roomUserModel->where('room_id', $room->name)
+      ->where('user_id', $userId)
+      ->first();
+    if (is_null($roomUser)) {
+      $roomUser = new RoomUser();
+      $roomUser->id = IdGenerator::generateId();
+      $roomUser->room_id = $room->name;
+      $roomUser->user_id = $userId;
+      $roomUser->joined = $now;
+      $roomUser->latest_poll = $now;
+      $this->roomUserModel->insert($roomUser);
+    }
 
     $this->db->transComplete();
     return $this->respond(new JoinRoomResponse(

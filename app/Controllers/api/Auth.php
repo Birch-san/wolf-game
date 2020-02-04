@@ -11,6 +11,7 @@ use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
+use Exception;
 use IdGenerator;
 
 class RegisterResponse {
@@ -69,6 +70,10 @@ class Auth extends BaseController
 
 	public function register()
   {
+    if ($id = (string) !empty($this->session->get('id'))) {
+      $name = (string) $this->session->get('name');
+      return $this->respond(new RegisterResponse($id, $name));
+    }
 //    $query = $this->db->query(/** @lang MariaDB */ 'SELECT UUID() AS id');
 //    $row = $query->getRow();
 //    $id = $row->id;
