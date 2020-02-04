@@ -7,7 +7,10 @@ use App\Controllers\BaseController;
 use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Exceptions\PageNotFoundException;
+use CodeIgniter\Session\Session;
 use Config\Database;
+use Config\Services;
+use Exception;
 
 class Position {
   /** @var int */
@@ -93,6 +96,8 @@ class World extends BaseController
 {
   use ResponseTrait;
 
+  /** @var Session */
+  protected $session;
   /** @var ConnectionInterface */
   protected $db;
 //  /** @var WolfModel */
@@ -100,6 +105,11 @@ class World extends BaseController
 
   public function __construct()
   {
+    $this->session =& Services::session();
+    $this->userId = (string) $this->session->get('id');
+    if (empty($this->userId)) {
+      throw new Exception('Not logged in');
+    }
     $this->db =& Database::connect();
 //    $this->wolfModel = new WolfModel($db);
   }
