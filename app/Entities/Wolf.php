@@ -5,5 +5,4 @@ use CodeIgniter\Entity;
 
 class Wolf extends Entity
 {
-
 }

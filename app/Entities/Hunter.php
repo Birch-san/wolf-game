@@ -3,6 +3,6 @@ namespace App\Entities;
 
 use CodeIgniter\Entity;
 
-class RoomUserHunter extends Entity
+class Hunter extends Entity
 {
 }

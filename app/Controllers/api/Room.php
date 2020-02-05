@@ -5,15 +5,15 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Entities\RoomUser;
-use App\Entities\RoomUserEntity;
-use App\Entities\RoomUserPlayer;
-use App\Entities\RoomUserWolf;
+use App\Entities\Entity;
+use App\Entities\Player;
+use App\Entities\Wolf;
 use App\Models\RoomModel;
-use App\Models\RoomUserEntityModel;
-use App\Models\RoomUserHunterModel;
+use App\Models\EntityModel;
+use App\Models\HunterModel;
 use App\Models\RoomUserModel;
-use App\Models\RoomUserPlayerModel;
-use App\Models\RoomUserWolfModel;
+use App\Models\PlayerModel;
+use App\Models\WolfModel;
 use App\Models\UserModel;
 use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\Database\ConnectionInterface;
@@ -61,14 +61,14 @@ class Room extends BaseController
   protected $userModel;
   /** @var RoomUserModel */
   protected $roomUserModel;
-  /** @var RoomUserEntityModel */
-  protected $roomUserEntityModel;
-  /** @var RoomUserPlayerModel */
-  protected $roomUserPlayerModel;
-  /** @var RoomUserWolfModel */
-  protected $roomUserWolfModel;
-  /** @var RoomUserHunterModel */
-  protected $roomUserHunterModel;
+  /** @var EntityModel */
+  protected $entityModel;
+  /** @var PlayerModel */
+  protected $playerModel;
+  /** @var WolfModel */
+  protected $wolfModel;
+  /** @var HunterModel */
+  protected $hunterModel;
   /** @var string */
   protected $userId;
 
@@ -81,10 +81,10 @@ class Room extends BaseController
     $this->roomModel = new RoomModel($db);
     $this->userModel = new UserModel($db);
     $this->roomUserModel = new RoomUserModel($db);
-    $this->roomUserEntityModel = new RoomUserEntityModel($db);
-    $this->roomUserPlayerModel = new RoomUserPlayerModel($db);
-    $this->roomUserWolfModel = new RoomUserWolfModel($db);
-    $this->roomUserHunterModel = new RoomUserHunterModel($db);
+    $this->entityModel = new EntityModel($db);
+    $this->playerModel = new PlayerModel($db);
+    $this->wolfModel = new WolfModel($db);
+    $this->hunterModel = new HunterModel($db);
   }
 
   public function _remap($method, ...$params)
@@ -114,7 +114,8 @@ class Room extends BaseController
     }
     $userId = (string) $this->session->get('id');
     /** @var RoomUser|null $roomUser */
-    $roomUser = $this->roomUserModel->where('room_id', $room->name)
+    $roomUser = $this->roomUserModel
+      ->where('room_id', $room->name)
       ->where('user_id', $userId)
       ->first();
     if (is_null($roomUser)) {
@@ -127,39 +128,44 @@ class Room extends BaseController
       $this->roomUserModel->insert($roomUser);
     }
 
-    /** @var RoomUserEntity|null $roomUserEntity */
-    $roomUserEntity = $this->roomUserEntityModel->where('room_user_id', $roomUser->id)
+    /** @var Entity|null $entity */
+    $entity = $this->entityModel
+      ->where('room_id', $room->name)
+      ->where('user_id', $userId)
       ->first();
-    if (is_null($roomUserEntity)) {
-      $roomUserEntity = new RoomUserEntity();
-      $roomUserEntity->id = IdGenerator::generateId();
-      $roomUserEntity->room_user_id = $roomUser->id;
-      $roomUserEntity->type = 'player';
-      $this->roomUserEntityModel->insert($roomUserEntity);
+    if (is_null($entity)) {
+      $entity = new Entity();
+      $entity->id = IdGenerator::generateId();
+      $entity->room_id = $room->name;
+      $entity->user_id = $userId;
+      $entity->type = 'player';
+      $this->entityModel->insert($entity);
     }
 
-    /** @var RoomUserPlayer|null $roomUserPlayer */
-    $roomUserPlayer = $this->roomUserPlayerModel->where('room_user_entity_id', $roomUserEntity->id)
+    /** @var Player|null $player */
+    $player = $this->playerModel
+      ->where('entity_id', $entity->id)
       ->first();
-    if (is_null($roomUserPlayer)) {
-      $roomUserPlayer = new RoomUserPlayer();
-      $roomUserPlayer->id = IdGenerator::generateId();
-      $roomUserPlayer->room_user_entity_id = $roomUserEntity->id;
-      $roomUserPlayer->type = 'wolf';
-      $roomUserPlayer->alive = true;
-      $roomUserPlayer->respawn_ticks = 0;
-      $this->roomUserPlayerModel->insert($roomUserPlayer);
+    if (is_null($player)) {
+      $player = new Player();
+      $player->id = IdGenerator::generateId();
+      $player->entity_id = $entity->id;
+      $player->type = 'wolf';
+      $player->alive = true;
+      $player->respawn_ticks = 0;
+      $this->playerModel->insert($player);
     }
 
-    /** @var RoomUserWolf|null $roomUserWolf */
-    $roomUserWolf = $this->roomUserWolfModel->where('room_user_entity_id', $roomUserPlayer->id)
+    /** @var Wolf|null $wolf */
+    $wolf = $this->wolfModel
+      ->where('entity_id', $entity->id)
       ->first();
-    if (is_null($roomUserWolf)) {
-      $roomUserWolf = new RoomUserWolf();
-      $roomUserWolf->id = IdGenerator::generateId();
-      $roomUserWolf->room_user_entity_id = $roomUserPlayer->id;
-      $roomUserWolf->howling = true;
-      $this->roomUserWolfModel->insert($roomUserWolf);
+    if (is_null($wolf)) {
+      $wolf = new Wolf();
+      $wolf->id = IdGenerator::generateId();
+      $wolf->entity_id = $entity->id;
+      $wolf->howling = true;
+      $this->wolfModel->insert($wolf);
     }
 
     $this->db->transComplete();

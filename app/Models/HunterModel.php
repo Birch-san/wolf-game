@@ -3,15 +3,15 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class WolfModel extends Model
+class HunterModel extends Model
 {
-  protected $table      = 'wolves';
+  protected $table      = 'hunters';
   protected $primaryKey = 'entity_id';
 
-  protected $returnType = 'App\Entities\Wolf';
+  protected $returnType = 'App\Entities\Hunter';
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['entity_id', 'howling'];
+  protected $allowedFields = ['entity_id', 'reload_ticks'];
 
   protected $validationRules    = [];
   protected $validationMessages = [];
