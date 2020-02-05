@@ -10,6 +10,7 @@ use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
+use ErrorResponse;
 use Exception;
 
 class Position {
@@ -117,6 +118,9 @@ class World extends BaseController
   public function _remap(string $method, string ...$params) {
     if (method_exists($this, $method))
     {
+      if (empty($this->userId)) {
+        return $this->respond(new ErrorResponse('Not logged in'), 401);
+      }
       switch($method) {
         /** @noinspection PhpMissingBreakStatementInspection */
         case 'room':

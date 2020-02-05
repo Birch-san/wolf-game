@@ -6,12 +6,12 @@ use CodeIgniter\Model;
 class RoomUserHunterModel extends Model
 {
   protected $table      = 'room_user_hunters';
-  protected $primaryKey = 'room_user_player_id';
+  protected $primaryKey = 'room_user_entity_id';
 
   protected $returnType = 'App\Entities\RoomUserHunter';
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['room_user_player_id', 'reload_ticks'];
+  protected $allowedFields = ['room_user_entity_id', 'reload_ticks'];
 
   protected $validationRules    = [];
   protected $validationMessages = [];

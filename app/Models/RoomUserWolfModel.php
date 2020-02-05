@@ -6,12 +6,12 @@ use CodeIgniter\Model;
 class RoomUserWolfModel extends Model
 {
   protected $table      = 'room_user_wolves';
-  protected $primaryKey = 'room_user_player_id';
+  protected $primaryKey = 'room_user_entity_id';
 
   protected $returnType = 'App\Entities\RoomUserWolf';
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['room_user_player_id', 'howling'];
+  protected $allowedFields = ['room_user_entity_id', 'howling'];
 
   protected $validationRules    = [];
   protected $validationMessages = [];
