@@ -1,6 +1,7 @@
 <?php
 namespace App\Models;
 
+use App\Entities\Entity;
 use CodeIgniter\Model;
 
 class EntityModel extends Model
@@ -8,7 +9,7 @@ class EntityModel extends Model
   protected $table      = 'entities';
   protected $primaryKey = 'id';
 
-  protected $returnType = 'App\Entities\Entity';
+  protected $returnType = Entity::class;
   protected $useSoftDeletes = false;
 
   protected $allowedFields = ['id', 'room_id', 'user_id', 'type', 'pos_x', 'pos_y'];

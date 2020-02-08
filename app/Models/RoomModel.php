@@ -1,6 +1,7 @@
 <?php
 namespace App\Models;
 
+use App\Entities\Room;
 use CodeIgniter\Model;
 
 class RoomModel extends Model
@@ -8,10 +9,10 @@ class RoomModel extends Model
   protected $table      = 'rooms';
   protected $primaryKey = 'name';
 
-  protected $returnType = 'App\Entities\Room';
+  protected $returnType = Room::class;
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['name', 'last_updated'];
+  protected $allowedFields = ['name', 'last_updated', 'terrain'];
 
   protected $validationRules    = [];
   protected $validationMessages = [];

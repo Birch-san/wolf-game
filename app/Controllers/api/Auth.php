@@ -11,8 +11,8 @@ use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
-use Exception;
 use IdGenerator;
+use ReflectionException;
 
 class RegisterResponse {
   /** @var string */
@@ -43,6 +43,7 @@ class MeResponse {
   }
 }
 
+/** @noinspection PhpUnused */
 class Auth extends BaseController
 {
   use ResponseTrait;
@@ -56,8 +57,8 @@ class Auth extends BaseController
 
   public function __construct()
   {
-    $this->session =& Services::session();
-    $this->db =& Database::connect();
+    $this->session = Services::session();
+    $this->db = Database::connect();
     $this->userModel = new UserModel($db);
   }
 
@@ -68,6 +69,10 @@ class Auth extends BaseController
     return $this->respond(new MeResponse(!empty($id), $id, $name));
   }
 
+  /**
+   * @return mixed
+   * @throws ReflectionException
+   */
 	public function register()
   {
     if ($id = (string) !empty($this->session->get('id'))) {

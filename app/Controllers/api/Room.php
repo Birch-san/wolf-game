@@ -4,17 +4,17 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
-use App\Entities\RoomUser;
 use App\Entities\Entity;
 use App\Entities\Player;
+use App\Entities\RoomUser;
 use App\Entities\Wolf;
-use App\Models\RoomModel;
 use App\Models\EntityModel;
 use App\Models\HunterModel;
-use App\Models\RoomUserModel;
 use App\Models\PlayerModel;
-use App\Models\WolfModel;
+use App\Models\RoomModel;
+use App\Models\RoomUserModel;
 use App\Models\UserModel;
+use App\Models\WolfModel;
 use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Exceptions\PageNotFoundException;
@@ -23,8 +23,8 @@ use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
 use ErrorResponse;
-use Exception;
 use IdGenerator;
+use ReflectionException;
 
 class JoinRoomResponse {
   /** @var string */
@@ -47,6 +47,7 @@ class JoinRoomResponse {
   }
 }
 
+/** @noinspection PhpUnused */
 class Room extends BaseController
 {
   use ResponseTrait;
@@ -74,10 +75,10 @@ class Room extends BaseController
 
   public function __construct()
   {
-    $this->session =& Services::session();
+    $this->session = Services::session();
     $this->userId = (string) $this->session->get('id');
 
-    $this->db =& Database::connect();
+    $this->db = Database::connect();
     $this->roomModel = new RoomModel($db);
     $this->userModel = new UserModel($db);
     $this->roomUserModel = new RoomUserModel($db);
@@ -87,6 +88,7 @@ class Room extends BaseController
     $this->hunterModel = new HunterModel($db);
   }
 
+  /** @noinspection PhpUnused */
   public function _remap($method, ...$params)
   {
     if (method_exists($this, $method))
@@ -99,10 +101,14 @@ class Room extends BaseController
     throw PageNotFoundException::forPageNotFound();
   }
 
+  /**
+   * @param string $name
+   * @return mixed
+   * @throws ReflectionException
+   */
   public function join(string $name)
   {
     $this->db->transBegin();
-    $this->db->transStrict(false);
     $now = new Time();
     /** @var \App\Entities\Room|null $room */
     $room = $this->roomModel->find($name);
@@ -110,6 +116,16 @@ class Room extends BaseController
       $room = new \App\Entities\Room();
       $room->name = $name;
       $room->last_updated = $now;
+      $room->terrain = [
+        [1,0,0,0,0,0,0,1],
+        [1,0,1,0,0,1,0,1],
+        [1,0,0,0,1,0,0,1],
+        [1,0,0,0,1,0,0,1],
+        [1,0,0,0,0,0,0,1],
+        [1,0,1,1,0,0,0,1],
+        [1,0,0,1,0,0,1,1],
+        [1,0,0,0,0,0,0,1],
+      ];
       $this->roomModel->insert($room);
     }
     $userId = (string) $this->session->get('id');
@@ -164,7 +180,7 @@ class Room extends BaseController
       $wolf = new Wolf();
       $wolf->id = IdGenerator::generateId();
       $wolf->entity_id = $entity->id;
-      $wolf->howling = true;
+      $wolf->howling = false;
       $this->wolfModel->insert($wolf);
     }
 
@@ -172,16 +188,8 @@ class Room extends BaseController
     return $this->respond(new JoinRoomResponse(
       $name,
       $room->last_updated,
-      [
-      [1,0,0,0,0,0,0,1],
-      [1,0,1,0,0,1,0,1],
-      [1,0,0,0,1,0,0,1],
-      [1,0,0,0,1,0,0,1],
-      [1,0,0,0,0,0,0,1],
-      [1,0,1,1,0,0,0,1],
-      [1,0,0,1,0,0,1,1],
-      [1,0,0,0,0,0,0,1],
-    ]));
+      $room->terrain
+    ));
   }
 
 	//--------------------------------------------------------------------
