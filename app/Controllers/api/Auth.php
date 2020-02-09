@@ -84,7 +84,14 @@ class Auth extends BaseController
 //    $id = $row->id;
     $id = IdGenerator::generateId();
 
-    $name = 'lol';
+//    $names = [
+//      'Bigby',
+//      'Amaterasu',
+//      'Greycub',
+//    ];
+//    $name = $names[array_rand($names)];
+    $idPrefix = substr($id, 0, 3);
+    $name = "Player $idPrefix";
 
     $user = new User();
     $user->id = $id;

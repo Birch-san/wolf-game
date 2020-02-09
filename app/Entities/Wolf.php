@@ -6,7 +6,6 @@ use CodeIgniter\Entity;
 /**
  * Class Wolf
  * @package App\Entities
- * @property string id
  * @property string entity_id
  * @property boolean howling
  */

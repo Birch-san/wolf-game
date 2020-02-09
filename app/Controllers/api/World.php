@@ -4,8 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
-use App\Entities\Entity;
-use App\Entities\RoomUser;
+use App\Libraries\Position;
 use App\Models\EntityModel;
 use App\Models\HunterModel;
 use App\Models\PlayerModel;
@@ -17,25 +16,10 @@ use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Database\Query;
 use CodeIgniter\Exceptions\PageNotFoundException;
-use CodeIgniter\I18n\Time;
 use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
 use ErrorResponse;
-use Exception;
-
-class Position {
-  /** @var int */
-  public $x;
-  /** @var int */
-  public $y;
-
-  public function __construct(int $x, int $y)
-  {
-    $this->x = $x;
-    $this->y = $y;
-  }
-}
 
 class PlayerView {
   /** @var string */
