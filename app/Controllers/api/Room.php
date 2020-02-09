@@ -64,13 +64,14 @@ class ScoreView {
   /** @var int */
   public $wolf_count;
 
-  public function __construct()
-  {
-    $this->hunter_score
-      = $this->hunter_count
-      = $this->wolf_score
-      = $this->wolf_count
+  public static function constructEmpty(): ScoreView {
+    $score = new ScoreView();
+    $score->hunter_score
+      = $score->hunter_count
+      = $score->wolf_score
+      = $score->wolf_count
       = 0;
+    return $score;
   }
 }
 
@@ -190,7 +191,7 @@ SQL;
     $scoreResults = $scoreQuery->execute($room->name);
     /** @var ScoreView[]|null $scores */
     $scores = $scoreResults->getCustomResultObject(ScoreView::class);
-    $score = $scores[0] ?? new ScoreView();
+    $score = $scores[0] ?? ScoreView::constructEmpty();
     $playerType = $score->hunter_score > $score->wolf_score
     || ($score->hunter_score === $score->wolf_score
       && $score->hunter_count > $score->wolf_count)

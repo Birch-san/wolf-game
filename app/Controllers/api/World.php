@@ -189,7 +189,6 @@ class World extends BaseController
 
   private function updateWorld(string $roomName)
   {
-    $this->db->transBegin();
     $touchRoomUserQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
 update room_users ru
@@ -200,7 +199,7 @@ SQL;
       return (new Query($db))->setQuery($sql);
     });
     $touchRoomUserQuery->execute($roomName, $this->userId);
-
+    $this->db->transBegin();
 //    $getIdleUsersQuery = $this->db->query(<<<SQL
 //select user_id
 //from room_users ru
@@ -209,7 +208,22 @@ SQL;
 //    );
 //    /** @var string[] $userIds */
 //    $userIds = array_column($getIdleUsersQuery->getResultArray(), 'user_id');
-    $this->db->simpleQuery(<<<SQL
+    $getLockQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+SELECT GET_LOCK(CONCAT('update_room_', ?), 1) AS lock_status
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $results = $getLockQuery->execute($roomName);
+
+    /** @var object $lock */
+    $lock = $results->getFirstRow();
+    if (!$lock->lock_status) {
+      return $this->respond("Didn't acquire lock");
+    }
+
+    $garbageCollectQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
 delete ru, e, h, w, p
 from room_users ru
 left outer join entities e
@@ -222,8 +236,19 @@ left outer join wolves w
 left outer join players p
   on p.entity_id = e.id
 where ru.latest_poll < DATE_SUB(NOW(), INTERVAL 15 SECOND)
-SQL
-    );
+  and ru.room_id = ?
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $garbageCollectQuery->execute($roomName);
+
+    $releaseLockQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+SELECT RELEASE_LOCK(CONCAT('update_room_', ?))
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $releaseLockQuery->execute($roomName);
 
     $this->db->transComplete();
     return $this->respond($roomName);
