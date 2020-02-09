@@ -118,6 +118,11 @@ class EntityView {
   public $wolf_howling;
 }
 
+class IdleUserView {
+  /** @var string */
+  public $user_id;
+}
+
 /** @noinspection PhpUnused */
 class World extends BaseController
 {
@@ -182,9 +187,46 @@ class World extends BaseController
     throw PageNotFoundException::forPageNotFound();
   }
 
-  private function updateWorld(string $room)
+  private function updateWorld(string $roomName)
   {
-    return $this->respond($room);
+    $this->db->transBegin();
+    $touchRoomUserQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+update room_users ru
+set ru.latest_poll = now()
+where room_id = ?
+  and user_id = ?
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $touchRoomUserQuery->execute($roomName, $this->userId);
+
+//    $getIdleUsersQuery = $this->db->query(<<<SQL
+//select user_id
+//from room_users ru
+//where ru.latest_poll < DATE_SUB(NOW(), INTERVAL 15 SECOND);
+//SQL
+//    );
+//    /** @var string[] $userIds */
+//    $userIds = array_column($getIdleUsersQuery->getResultArray(), 'user_id');
+    $this->db->simpleQuery(<<<SQL
+delete ru, e, h, w, p
+from room_users ru
+left outer join entities e
+  on e.room_id = ru.room_id
+ and e.user_id = ru.user_id
+left outer join hunters h
+  on h.entity_id = e.id
+left outer join wolves w
+  on w.entity_id = e.id
+left outer join players p
+  on p.entity_id = e.id
+where ru.latest_poll < DATE_SUB(NOW(), INTERVAL 15 SECOND)
+SQL
+    );
+
+    $this->db->transComplete();
+    return $this->respond($roomName);
   }
 
   /** @noinspection PhpUnused */

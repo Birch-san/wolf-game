@@ -155,6 +155,7 @@ class Room extends BaseController
       ];
       $this->roomModel->insert($room);
     }
+
     $userId = (string) $this->session->get('id');
     /** @var RoomUser|null $roomUser */
     $roomUser = $this->roomUserModel
