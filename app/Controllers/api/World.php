@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Entities\Entity;
+use App\Entities\RoomUser;
 use App\Libraries\Position;
 use App\Models\EntityModel;
 use App\Models\HunterModel;
@@ -22,46 +24,81 @@ use Config\Services;
 use ErrorResponse;
 
 class PlayerView {
-  /** @var string */
-  public $username;
-  /** @var string */
-  public $entityId;
-  /** @var Position|null */
-  public $position;
   /** @var int */
   public $score;
 
   public function __construct(
-    string $entityId,
-    string $username,
-    ?Position $position,
     int $score
   ) {
-    $this->entityId = $entityId;
-    $this->username = $username;
-    $this->position = $position;
     $this->score = $score;
   }
 }
 
+class UserView {
+  /** @var string */
+  public $id;
+
+  /** @var string */
+  public $name;
+
+  public function __construct(
+    string $id,
+    string $name
+  ) {
+    $this->id = $id;
+    $this->name = $name;
+  }
+}
+
+class EntityView {
+  /** @var string */
+  public $id;
+
+  /** @var Position|null */
+  public $position;
+
+  /** @var UserView|null */
+  public $user;
+
+  public function __construct(
+    string $id,
+    ?Position $position,
+    ?UserView $user
+  ) {
+    $this->id = $id;
+    $this->position = $position;
+    $this->user = $user;
+  }
+}
+
 class HunterView {
+  /** @var EntityView */
+  public $entity;
+
   /** @var PlayerView */
   public $player;
 
   public function __construct(
+    EntityView $entity,
     PlayerView $player
   ) {
+    $this->entity = $entity;
     $this->player = $player;
   }
 }
 
 class WolfView {
+  /** @var EntityView */
+  public $entity;
+
   /** @var PlayerView */
   public $player;
 
   public function __construct(
+    EntityView $entity,
     PlayerView $player
   ) {
+    $this->entity = $entity;
     $this->player = $player;
   }
 }
@@ -83,7 +120,7 @@ class GetWorldResponse {
   }
 }
 
-class EntityView {
+class EntityDenormalizedView {
   /** @var string */
   public $id;
 
@@ -284,6 +321,18 @@ SQL;
   /** @noinspection PhpUnused */
   public function room(string $roomName)
   {
+    $this->db->transBegin();
+    /** @var RoomUser|null $roomUser */
+    $roomUser = $this->roomUserModel
+      ->where('room_id', $roomName)
+      ->where('user_id', $this->userId)
+      ->first();
+    if (is_null($roomUser)) {
+      return $this->respond([
+        'error' => 'USER_NOT_IN_ROOM'
+      ], 400);
+    }
+
     $query = $this->db->prepare(function($db) {
       $sql = <<<SQL
 select
@@ -323,13 +372,14 @@ SQL;
       return (new Query($db))->setQuery($sql);
     });
     $results = $query->execute($roomName);
-    /** @var EntityView[]|null $entities */
-    $entities = $results->getCustomResultObject(EntityView::class);
+    $this->db->transComplete();
+    /** @var EntityDenormalizedView[]|null $entities */
+    $entities = $results->getCustomResultObject(EntityDenormalizedView::class);
     $response = array_reduce(
       $entities,
       /**
        * @param GetWorldResponse $acc
-       * @param EntityView $entity
+       * @param EntityDenormalizedView $entity
        * @return GetWorldResponse
        */
       function(&$acc, &$entity) {
@@ -338,18 +388,23 @@ SQL;
         : new Position(
           $entity->pos_x,
           $entity->pos_y);
-        $playerView = new PlayerView(
+        $entityView = new EntityView(
           $entity->id,
-          $entity->user_name,
           $position,
+          new UserView(
+            $entity->user_id,
+            $entity->user_name
+          )
+        );
+        $playerView = new PlayerView(
           $entity->player_score
         );
         switch($entity->player_type) {
           case 'wolf':
-            array_push($acc->wolves, new WolfView($playerView));
+            array_push($acc->wolves, new WolfView($entityView, $playerView));
             break;
           case 'hunter':
-            array_push($acc->hunters, new HunterView($playerView));
+            array_push($acc->hunters, new HunterView($entityView, $playerView));
             break;
         }
         return $acc;
