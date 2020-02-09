@@ -192,7 +192,7 @@ class World extends BaseController
     $touchRoomUserQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
 update room_users ru
-set ru.latest_poll = now()
+set ru.latest_poll = now(3)
 where room_id = ?
   and user_id = ?
 SQL;
@@ -214,13 +214,40 @@ SELECT GET_LOCK(CONCAT('update_room_', ?), 1) AS lock_status
 SQL;
       return (new Query($db))->setQuery($sql);
     });
-    $results = $getLockQuery->execute($roomName);
+    $getLockResults = $getLockQuery->execute($roomName);
 
     /** @var object $lock */
-    $lock = $results->getFirstRow();
+    $lock = $getLockResults->getFirstRow();
     if (!$lock->lock_status) {
       return $this->respond("Didn't acquire lock");
     }
+
+    $getRoomAgeQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+# 500,000 micros = 500 millis
+select r.last_updated < DATE_SUB(NOW(3), INTERVAL 500000 MICROSECOND) AS room_old
+from rooms r
+where r.name = ?
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $getRoomAgeResults = $getRoomAgeQuery->execute($roomName);
+
+    /** @var object $roomAge */
+    $roomAge = $getRoomAgeResults->getFirstRow();
+    if (!$roomAge->room_old) {
+      return $this->respond("Room is not sufficiently old");
+    }
+
+    $touchRoomQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+update rooms r
+set r.last_updated = now(3)
+where r.name = ?
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $touchRoomQuery->execute($roomName);
 
     $garbageCollectQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
@@ -251,7 +278,7 @@ SQL;
     $releaseLockQuery->execute($roomName);
 
     $this->db->transComplete();
-    return $this->respond($roomName);
+    return $this->respond("Successfully updated room '$roomName'");
   }
 
   /** @noinspection PhpUnused */
