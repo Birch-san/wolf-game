@@ -9,6 +9,7 @@ use App\Entities\Hunter;
 use App\Entities\Player;
 use App\Entities\RoomUser;
 use App\Entities\Wolf;
+use App\Libraries\ErrorCodes;
 use App\Libraries\Position;
 use App\Models\EntityModel;
 use App\Models\HunterModel;
@@ -122,7 +123,7 @@ class Room extends BaseController
     if (method_exists($this, $method))
     {
       if (empty($this->userId)) {
-        return $this->respond(new ErrorResponse('Not logged in'), 401);
+        return $this->respond(new ErrorResponse(ErrorCodes::NOT_LOGGED_IN, 'Not logged in'), 401);
       }
       return $this->$method(...$params);
     }

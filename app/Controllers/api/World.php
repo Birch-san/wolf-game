@@ -6,6 +6,7 @@ namespace App\Controllers\Api;
 use apimatic\jsonmapper\JsonMapper;
 use App\Controllers\BaseController;
 use App\Entities\RoomUser;
+use App\Libraries\ErrorCodes;
 use App\Libraries\Position;
 use App\Models\EntityModel;
 use App\Models\HunterModel;
@@ -22,6 +23,8 @@ use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
 use ErrorResponse;
+use IdGenerator;
+use MessageResponse;
 
 class PlayerView {
   /** @var int */
@@ -166,6 +169,10 @@ class IdleUserView {
 class ActionRequest {
   /** @var string */
   public $type;
+  /** @var \CodeIgniter\I18n\Time
+   * @noinspection PhpFullyQualifiedNameUsageInspection
+   */
+  public $time;
 }
 
 /**
@@ -229,7 +236,7 @@ class World extends BaseController
     if (method_exists($this, $method))
     {
       if (empty($this->userId)) {
-        return $this->respond(new ErrorResponse('Not logged in'), 401);
+        return $this->respond(new ErrorResponse(ErrorCodes::NOT_LOGGED_IN,'Not logged in'), 401);
       }
       switch($method) {
         /** @noinspection PhpMissingBreakStatementInspection */
@@ -255,18 +262,65 @@ class World extends BaseController
     /** @var ActionRequest|null $actionRequest */
     $actionRequest = $this->mapper->mapClass($body, ActionRequest::class);
     if (is_null($actionRequest)) {
-      return $this->respond(new ErrorResponse('Failed to unmarshal action'), 400);
+      return $this->respond(new ErrorResponse(ErrorCodes::CLIENT_ERROR, 'Failed to unmarshal action'), 400);
     }
     if ($actionRequest instanceof MoveActionRequest) {
       return $this->actMove($roomName, $actionRequest);
     }
 
-    return $this->respond(new ErrorResponse("Action '$actionRequest->type' not supported"), 400);
+    return $this->respond(new ErrorResponse(ErrorCodes::CLIENT_ERROR,"Action '$actionRequest->type' not supported"), 400);
   }
 
   private function actMove(string $roomName, MoveActionRequest $request)
   {
-    return $this->respond($request);
+    $this->db->transBegin();
+    $actionId = IdGenerator::generateId();
+
+    $actQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+insert into actions
+    (id,
+     room_id,
+     user_id,
+     type,
+     submitted_time_client)
+values
+       (?, ?, ?, ?, ?)
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+//    /** @var string[] $matches */
+//    $dateTimeMilliMatches = [];
+//    preg_match('/.*\.\d{3}/', $request->time->date, $dateTimeMilliMatches);
+//    /** @var string $dateTimeMilliMatch */
+//    $dateTimeMilliMatch = $dateTimeMilliMatches[0];
+    $actQuery->execute(
+      $actionId,
+      $roomName,
+      $this->userId,
+      'move',
+      $request->time->format('Y-m-d H:i:s.v')
+      );
+
+    $moveActQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+insert into move_actions
+    (action_id,
+     x,
+     y)
+values
+       (?, ?, ?)
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $moveActQuery->execute(
+      $actionId,
+      $request->x,
+      $request->y);
+
+    $this->db->transComplete();
+    return $this->respond(new MessageResponse("Successfully acted"));
+//    return $this->respond($request);
   }
 
   private function updateWorld(string $roomName)
@@ -301,7 +355,7 @@ SQL;
     /** @var object $lock */
     $lock = $getLockResults->getFirstRow();
     if (!$lock->lock_status) {
-      return $this->respond("Didn't acquire lock");
+      return $this->respond(new MessageResponse("Didn't acquire lock"));
     }
 
     $getRoomAgeQuery = $this->db->prepare(function($db) {
@@ -318,7 +372,7 @@ SQL;
     /** @var object $roomAge */
     $roomAge = $getRoomAgeResults->getFirstRow();
     if (!$roomAge->room_old) {
-      return $this->respond("Room is not sufficiently old");
+      return $this->respond(new MessageResponse("Room is not sufficiently old"));
     }
 
     $touchRoomQuery = $this->db->prepare(function($db) {
@@ -360,7 +414,7 @@ SQL;
     $releaseLockQuery->execute($roomName);
 
     $this->db->transComplete();
-    return $this->respond("Successfully updated room '$roomName'");
+    return $this->respond(new MessageResponse("Successfully updated room '$roomName'"));
   }
 
   /** @noinspection PhpUnused */
