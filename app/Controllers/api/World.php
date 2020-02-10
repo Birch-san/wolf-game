@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api;
 
+use apimatic\jsonmapper\JsonMapper;
 use App\Controllers\BaseController;
-use App\Entities\Entity;
 use App\Entities\RoomUser;
 use App\Libraries\Position;
 use App\Models\EntityModel;
@@ -160,6 +160,24 @@ class IdleUserView {
   public $user_id;
 }
 
+/**
+ * @discriminator type
+ */
+class ActionRequest {
+  /** @var string */
+  public $type;
+}
+
+/**
+ * @discriminator type
+ * @discriminatorType move
+ */
+class MoveActionRequest extends ActionRequest {
+  /** @var int */
+  public $x;
+  public $y;
+}
+
 /** @noinspection PhpUnused */
 class World extends BaseController
 {
@@ -169,6 +187,8 @@ class World extends BaseController
   protected $session;
   /** @var ConnectionInterface */
   protected $db;
+  /** @var JsonMapper */
+  protected $mapper;
   /** @var RoomModel */
   protected $roomModel;
   /** @var UserModel */
@@ -199,6 +219,9 @@ class World extends BaseController
     $this->playerModel = new PlayerModel($db);
     $this->wolfModel = new WolfModel($db);
     $this->hunterModel = new HunterModel($db);
+
+    $this->mapper = new JsonMapper();
+    $this->mapper->arChildClasses[ActionRequest::class] = [MoveActionRequest::class];
   }
 
   /** @noinspection PhpUnused */
@@ -215,6 +238,8 @@ class World extends BaseController
             switch($params[1]) {
               case 'update':
               return $this->updateWorld($params[0]);
+              case 'act':
+              return $this->act($params[0]);
             }
           }
         default:
@@ -222,6 +247,26 @@ class World extends BaseController
       }
     }
     throw PageNotFoundException::forPageNotFound();
+  }
+
+  private function act(string $roomName)
+  {
+    $body = $this->request->getJSON();
+    /** @var ActionRequest|null $actionRequest */
+    $actionRequest = $this->mapper->mapClass($body, ActionRequest::class);
+    if (is_null($actionRequest)) {
+      return $this->respond(new ErrorResponse('Failed to unmarshal action'), 400);
+    }
+    if ($actionRequest instanceof MoveActionRequest) {
+      return $this->actMove($roomName, $actionRequest);
+    }
+
+    return $this->respond(new ErrorResponse("Action '$actionRequest->type' not supported"), 400);
+  }
+
+  private function actMove(string $roomName, MoveActionRequest $request)
+  {
+    return $this->respond($request);
   }
 
   private function updateWorld(string $roomName)
