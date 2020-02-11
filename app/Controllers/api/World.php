@@ -5,6 +5,7 @@ namespace App\Controllers\Api;
 
 use apimatic\jsonmapper\JsonMapper;
 use App\Controllers\BaseController;
+use App\Entities\Entity;
 use App\Entities\RoomUser;
 use App\Libraries\ErrorCodes;
 use App\Libraries\Position;
@@ -26,6 +27,7 @@ use Config\Services;
 use ErrorResponse;
 use IdGenerator;
 use MessageResponse;
+use ReflectionException;
 
 class PlayerView {
   /** @var int */
@@ -336,12 +338,43 @@ SQL;
     return $this->respond(new MessageResponse("Successfully acted"));
   }
 
+  /**
+   * @param int[][] $terrain
+   * @param string $roomName
+   * @param string $userId
+   * @param int $x
+   * @param int $y
+   * @throws ReflectionException
+   */
   private function doMoveAct(
+    array $terrain,
     string $roomName,
     string $userId,
     int $x,
     int $y) {
-
+    /** @var Entity|null $player */
+    $player = $this->entityModel
+      ->where('room_id', $roomName)
+      ->where('user_id', $userId)
+      ->where('type', 'player')
+      ->find();
+    $proposedX = $player->pos_x + $x;
+    $proposedY = $player->pos_y + $y;
+    if ($x > 1
+      || $x < -1
+      || $y > 1
+      || $y < -1
+      || ($x !== 0 && $y !== 0)
+      || $proposedX > count($terrain[0]) - 1
+      || $proposedX < 0
+      || $proposedY > count($terrain) - 1
+      || $proposedY < 0
+      || $terrain[$proposedY][$proposedX] !== 0){
+      return;
+    }
+    $player->pos_x = $proposedX;
+    $player->pos_y = $proposedY;
+    $this->entityModel->save($player);
   }
 
   private function updateWorld(string $roomName)
@@ -467,9 +500,17 @@ SQL;
     $getActionsResults = $getActionsQuery->execute($roomName);
     /** @var ActionDenormalizedView[]|null $actions */
     $actions = $getActionsResults->getCustomResultObject(ActionDenormalizedView::class);
+
+    /** @var \App\Entities\Room|null $room */
+    $room = $this->roomModel->find($roomName);
     foreach($actions as $action) {
       if ($action->action_type === 'move') {
-        
+        $this->doMoveAct(
+          $room->terrain,
+          $roomName,
+          $action->user_id,
+          $action->move_x,
+          $action->move_y);
       }
     }
 
