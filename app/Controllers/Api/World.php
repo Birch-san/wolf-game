@@ -415,7 +415,7 @@ SQL;
     $getRoomAgeQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
 # 500,000 micros = 500 millis
-select r.last_updated < DATE_SUB(NOW(3), INTERVAL 500000 MICROSECOND) AS room_old
+select r.last_updated < DATE_SUB(NOW(3), INTERVAL r.update_freq_ms * 1000 MICROSECOND) AS room_old
 from rooms r
 where r.name = ?
 SQL;
