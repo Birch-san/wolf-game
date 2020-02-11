@@ -8,6 +8,7 @@ use CodeIgniter\I18n\Time;
  * Class Room
  * @package App\Entities
  * @property string name
+ * @property int update_freq_ms
  * @property Time last_updated
  * @property int[][] terrain
  */

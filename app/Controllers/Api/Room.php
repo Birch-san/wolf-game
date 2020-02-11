@@ -34,6 +34,8 @@ use ReflectionException;
 class JoinRoomResponse {
   /** @var string */
   public $name;
+  /** @var int */
+  public $updateFreqMs;
   /** @var string */
   public $lastUpdated;
   /** @var array[][] */
@@ -41,12 +43,14 @@ class JoinRoomResponse {
 
   /**
    * @param string $name
+   * @param int $updateFreqMs
    * @param Time $lastUpdated
    * @param int[][] $grid
    */
-  public function __construct(string $name, Time $lastUpdated, array $grid)
+  public function __construct(string $name, int $updateFreqMs, Time $lastUpdated, array $grid)
   {
     $this->name = $name;
+    $this->updateFreqMs = $updateFreqMs;
     $this->lastUpdated = $lastUpdated->format(DATE_ISO8601);
     $this->grid = $grid;
   }
@@ -144,6 +148,7 @@ class Room extends BaseController
     if (is_null($room)) {
       $room = new \App\Entities\Room();
       $room->name = $name;
+      $room->update_freq_ms = 500;
       $room->last_updated = $now;
       $room->terrain = [
         [1,0,0,0,0,0,0,1],
@@ -285,6 +290,7 @@ SQL;
     $this->db->transComplete();
     return $this->respond(new JoinRoomResponse(
       $name,
+      $room->update_freq_ms,
       $room->last_updated,
       $room->terrain
     ));
