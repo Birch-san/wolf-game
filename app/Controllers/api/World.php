@@ -19,6 +19,7 @@ use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Database\Query;
 use CodeIgniter\Exceptions\PageNotFoundException;
+use CodeIgniter\I18n\Time;
 use CodeIgniter\Session\Session;
 use Config\Database;
 use Config\Services;
@@ -158,6 +159,23 @@ class EntityDenormalizedView {
   public $wolf_howling;
 }
 
+class ActionDenormalizedView {
+  /** @var string */
+  public $user_id;
+
+  /** @var Time */
+  public $submitted_time_client;
+
+  /** @var string */
+  public $action_type;
+
+  /** @var int|null */
+  public $move_x;
+
+  /** @var int|null */
+  public $move_y;
+}
+
 class IdleUserView {
   /** @var string */
   public $user_id;
@@ -171,6 +189,7 @@ class ActionRequest {
   public $type;
   /** @var \CodeIgniter\I18n\Time
    * @noinspection PhpFullyQualifiedNameUsageInspection
+   * @noinspection RedundantSuppression
    */
   public $time;
 }
@@ -289,11 +308,6 @@ values
 SQL;
       return (new Query($db))->setQuery($sql);
     });
-//    /** @var string[] $matches */
-//    $dateTimeMilliMatches = [];
-//    preg_match('/.*\.\d{3}/', $request->time->date, $dateTimeMilliMatches);
-//    /** @var string $dateTimeMilliMatch */
-//    $dateTimeMilliMatch = $dateTimeMilliMatches[0];
     $actQuery->execute(
       $actionId,
       $roomName,
@@ -320,7 +334,14 @@ SQL;
 
     $this->db->transComplete();
     return $this->respond(new MessageResponse("Successfully acted"));
-//    return $this->respond($request);
+  }
+
+  private function doMoveAct(
+    string $roomName,
+    string $userId,
+    int $x,
+    int $y) {
+
   }
 
   private function updateWorld(string $roomName)
@@ -387,7 +408,7 @@ SQL;
 
     $garbageCollectQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
-delete ru, e, h, w, p
+delete ru, e, h, w, p, a, ma
 from room_users ru
 left outer join entities e
   on e.room_id = ru.room_id
@@ -398,12 +419,72 @@ left outer join wolves w
   on w.entity_id = e.id
 left outer join players p
   on p.entity_id = e.id
+left outer join actions a
+  on a.room_id = ru.room_id
+ and a.user_id = ru.user_id
+left outer join move_actions ma
+  on ma.action_id = a.id
 where ru.latest_poll < DATE_SUB(NOW(), INTERVAL 15 SECOND)
   and ru.room_id = ?
 SQL;
       return (new Query($db))->setQuery($sql);
     });
     $garbageCollectQuery->execute($roomName);
+
+    $getActionsQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+select q2.user_id,
+       q2.submitted_time_client,
+       q2.type as action_type,
+       m.x as move_x,
+       m.y as move_y
+from (select id,
+             user_id,
+             type,
+             submitted_time_client
+from (select id,
+             room_id,
+             user_id,
+             type,
+             submitted_time_client
+    from actions
+    where room_id = ?
+    order by room_id,
+             user_id,
+             type,
+             submitted_time_client desc
+    LIMIT 18446744073709551615
+    ) q1
+group by room_id,
+         user_id,
+         type desc) q2
+left outer join move_actions m
+  on q2.type = 'move'
+ and m.action_id = q2.id
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $getActionsResults = $getActionsQuery->execute($roomName);
+    /** @var ActionDenormalizedView[]|null $actions */
+    $actions = $getActionsResults->getCustomResultObject(ActionDenormalizedView::class);
+    foreach($actions as $action) {
+      if ($action->action_type === 'move') {
+        
+      }
+    }
+
+    $garbageCollectActionsQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+delete a, ma
+from actions a
+left outer join move_actions ma
+  on a.type = 'move'
+ and a.id = ma.action_id
+where a.room_id = ?
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $garbageCollectActionsQuery->execute($roomName);
 
     $releaseLockQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
