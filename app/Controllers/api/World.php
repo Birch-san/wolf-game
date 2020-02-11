@@ -357,7 +357,7 @@ SQL;
       ->where('room_id', $roomName)
       ->where('user_id', $userId)
       ->where('type', 'player')
-      ->find();
+      ->first();
     $proposedX = $player->pos_x + $x;
     $proposedY = $player->pos_y + $y;
     if ($x > 1
