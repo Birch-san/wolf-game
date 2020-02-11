@@ -15,5 +15,8 @@ use CodeIgniter\I18n\Time;
 class Room extends Entity
 {
   protected $dates = ['last_updated'];
-  protected $casts = ['terrain' => 'json-array'];
+  protected $casts = [
+    'update_freq_ms' => 'int',
+    'terrain' => 'json-array'
+    ];
 }
