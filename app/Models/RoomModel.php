@@ -12,7 +12,7 @@ class RoomModel extends Model
   protected $returnType = Room::class;
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['name', 'update_freq_ms', 'last_updated', 'terrain'];
+  protected $allowedFields = ['name', 'update_freq_ms', /* 'last_updated', */ 'terrain'];
 
   protected $validationRules    = [];
   protected $validationMessages = [];

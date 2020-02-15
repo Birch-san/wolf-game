@@ -36,22 +36,23 @@ class JoinRoomResponse {
   public $name;
   /** @var int */
   public $updateFreqMs;
-  /** @var string */
-  public $lastUpdated;
+//  /** @var string */
+//  public $lastUpdated;
   /** @var array[][] */
   public $grid;
 
   /**
    * @param string $name
    * @param int $updateFreqMs
-   * @param Time $lastUpdated
+   * param string $lastUpdated DB time, UTC, formatted like '2020-02-15 17:27:58.779'
    * @param int[][] $grid
    */
-  public function __construct(string $name, int $updateFreqMs, Time $lastUpdated, array $grid)
+  public function __construct(string $name, int $updateFreqMs, /* string $lastUpdated, */ array $grid)
   {
     $this->name = $name;
     $this->updateFreqMs = $updateFreqMs;
-    $this->lastUpdated = $lastUpdated->format(DATE_ISO8601);
+//    $this->lastUpdated = (new Time($lastUpdated))->format(DATE_ISO8601);
+//    $this->lastUpdated = $lastUpdated;
     $this->grid = $grid;
   }
 }
@@ -142,14 +143,15 @@ class Room extends BaseController
   public function join(string $name)
   {
     $this->db->transBegin();
-    $now = new Time();
+//    $now = new Time();
+//    $now = 'NOW(3)';
     /** @var \App\Entities\Room|null $room */
     $room = $this->roomModel->find($name);
     if (is_null($room)) {
       $room = new \App\Entities\Room();
       $room->name = $name;
       $room->update_freq_ms = 500;
-      $room->last_updated = $now;
+//      $room->last_updated = $now;
       $room->terrain = [
         [1,0,0,0,0,0,0,1],
         [1,0,1,0,0,1,0,1],
@@ -174,10 +176,13 @@ class Room extends BaseController
       $roomUser->id = IdGenerator::generateId();
       $roomUser->room_id = $room->name;
       $roomUser->user_id = $userId;
-      $roomUser->joined = $now;
-      $roomUser->latest_poll = $now;
+//      $roomUser->joined = $now;
+//      $roomUser->latest_poll = $now;
       $this->roomUserModel->insert($roomUser);
-    }
+    }/* else {
+      $roomUser->latest_poll = $now;
+      $this->roomUserModel->save($roomUser);
+    }*/
 
     $scoreQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
@@ -286,12 +291,21 @@ SQL;
         $this->hunterModel->insert($hunter);
       }
     }
+    $transactionStatusBeforeCommit = $this->db->transStatus();
 
     $this->db->transComplete();
+
+    $transactionStatusAfterCommit = $this->db->transStatus();
+
+    if (!$transactionStatusBeforeCommit
+      || !$transactionStatusAfterCommit) {
+      return $this->respond(new ErrorResponse(ErrorCodes::FAILED_QUERY, "Transaction failed. Status before commit: <$transactionStatusBeforeCommit>. Status after commit: <$transactionStatusAfterCommit>"), 500);
+    }
+
     return $this->respond(new JoinRoomResponse(
       $name,
       $room->update_freq_ms,
-      $room->last_updated,
+//      $room->last_updated,
       $room->terrain
     ));
   }

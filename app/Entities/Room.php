@@ -9,12 +9,12 @@ use CodeIgniter\I18n\Time;
  * @package App\Entities
  * @property string name
  * @property int update_freq_ms
- * @property Time last_updated
+ * @property string last_updated
  * @property int[][] terrain
  */
 class Room extends Entity
 {
-  protected $dates = ['last_updated'];
+//  protected $dates = ['last_updated'];
   protected $casts = [
     'update_freq_ms' => 'int',
     'terrain' => 'json-array'

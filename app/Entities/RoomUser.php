@@ -10,10 +10,10 @@ use CodeIgniter\I18n\Time;
  * @property string id
  * @property string room_id
  * @property string user_id
- * @property Time joined
- * @property Time latest_poll
+ * property string joined
+ * property string latest_poll
  */
 class RoomUser extends Entity
 {
-  protected $dates = ['joined', 'latest_poll'];
+//  protected $dates = ['joined', 'latest_poll'];
 }

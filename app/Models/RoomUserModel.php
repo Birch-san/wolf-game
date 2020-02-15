@@ -12,7 +12,7 @@ class RoomUserModel extends Model
   protected $returnType = RoomUser::class;
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['id', 'room_id', 'user_id', 'joined', 'latest_poll'];
+  protected $allowedFields = ['id', 'room_id', 'user_id', /* 'joined', 'latest_poll' */];
 
   protected $validationRules    = [];
   protected $validationMessages = [];

@@ -347,7 +347,7 @@ SQL;
    * @throws ReflectionException
    */
   private function doMoveAct(
-    array $terrain,
+    array &$terrain,
     string $roomName,
     string $userId,
     int $x,
@@ -358,8 +358,16 @@ SQL;
       ->where('user_id', $userId)
       ->where('type', 'player')
       ->first();
+    if (is_null($player)) {
+      return;
+    }
     $proposedX = $player->pos_x + $x;
     $proposedY = $player->pos_y + $y;
+//    log_message('info', 'xDelta {x}, yDelta {y}', [ 'x' => $x, 'y' => $y ]);
+//    log_message('info', 'player {x}, player {y}', [ 'x' => $player->pos_x, 'y' => $player->pos_y ]);
+//    log_message('info', 'proposed {x}, proposed {y}', [ 'x' => $proposedX, 'y' => $proposedY ]);
+//    log_message('info', 'terrain {terrain}', [ 'terrain' => var_export($terrain, true) ]);
+//    log_message('info', 'terrainCoord {coord}', [ 'coord' => $terrain[$proposedY][$proposedX] ]);
     if ($x > 1
       || $x < -1
       || $y > 1
@@ -390,14 +398,7 @@ SQL;
     });
     $touchRoomUserQuery->execute($roomName, $this->userId);
     $this->db->transBegin();
-//    $getIdleUsersQuery = $this->db->query(<<<SQL
-//select user_id
-//from room_users ru
-//where ru.latest_poll < DATE_SUB(NOW(), INTERVAL 15 SECOND);
-//SQL
-//    );
-//    /** @var string[] $userIds */
-//    $userIds = array_column($getIdleUsersQuery->getResultArray(), 'user_id');
+
     $getLockQuery = $this->db->prepare(function($db) {
       $sql = <<<SQL
 SELECT GET_LOCK(CONCAT('update_room_', ?), 1) AS lock_status
@@ -542,6 +543,7 @@ SQL;
   /** @noinspection PhpUnused */
   public function room(string $roomName)
   {
+//    return $this->respond(new ErrorResponse(ErrorCodes::CLIENT_ERROR, 'Suppressed'), 400);
     $this->db->transBegin();
     /** @var RoomUser|null $roomUser */
     $roomUser = $this->roomUserModel
@@ -549,9 +551,10 @@ SQL;
       ->where('user_id', $this->userId)
       ->first();
     if (is_null($roomUser)) {
-      return $this->respond([
-        'error' => 'USER_NOT_IN_ROOM'
-      ], 400);
+      return $this->respond(new ErrorResponse(
+        ErrorCodes::USER_NOT_IN_ROOM,
+        "User <$this->userId> not in room"
+      ), 400);
     }
 
     $query = $this->db->prepare(function($db) {

@@ -12,7 +12,7 @@ class UserModel extends Model
   protected $returnType = User::class;
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['id', 'name'];
+  protected $allowedFields = ['id', 'name', 'password_hash'/*, last_seen */];
 
   protected $validationRules    = [];
   protected $validationMessages = [];
