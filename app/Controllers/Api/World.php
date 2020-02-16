@@ -32,11 +32,23 @@ use ReflectionException;
 class PlayerView {
   /** @var int */
   public $score;
+  /** @var boolean */
+  public $alive;
+  /** @var int */
+  public $respawnTicks;
+  /** @var boolean */
+  public $isYou;
 
   public function __construct(
-    int $score
+    int $score,
+    bool $alive,
+    int $respawnTicks,
+    bool $isYou
   ) {
     $this->score = $score;
+    $this->alive = $alive;
+    $this->respawnTicks = $respawnTicks;
+    $this->isYou = $isYou;
   }
 }
 
@@ -84,12 +96,27 @@ class HunterView {
   /** @var PlayerView */
   public $player;
 
+  /** @var int */
+  public $petTicks;
+
+  /** @var int */
+  public $bitedTicks;
+
+  /** @var int */
+  public $reloadTicks;
+
   public function __construct(
     EntityView $entity,
-    PlayerView $player
+    PlayerView $player,
+    int $petTicks,
+    int $bitedTicks,
+    int $reloadTicks
   ) {
     $this->entity = $entity;
     $this->player = $player;
+    $this->petTicks = $petTicks;
+    $this->bitedTicks = $bitedTicks;
+    $this->reloadTicks = $reloadTicks;
   }
 }
 
@@ -100,12 +127,22 @@ class WolfView {
   /** @var PlayerView */
   public $player;
 
+  /** @var int */
+  public $biteTicks;
+
+  /** @var int */
+  public $pettedTicks;
+
   public function __construct(
     EntityView $entity,
-    PlayerView $player
+    PlayerView $player,
+    int $biteTicks,
+    int $pettedTicks
   ) {
     $this->entity = $entity;
     $this->player = $player;
+    $this->biteTicks = $biteTicks;
+    $this->pettedTicks = $pettedTicks;
   }
 }
 
@@ -132,6 +169,9 @@ class EntityDenormalizedView {
 
   /** @var string|null */
   public $user_id;
+
+  /** @var string|null */
+  public $entity_type;
 
   /** @var int|null */
   public $pos_x;
@@ -790,6 +830,7 @@ SQL;
 select
     e.id,
     e.user_id,
+    e.type as entity_type,
     e.pos_x,
     e.pos_y,
     u.name as user_name,
@@ -878,14 +919,32 @@ SQL;
           )
         );
         $playerView = new PlayerView(
-          $entity->player_score
+          $entity->player_score,
+          (bool)$entity->player_alive,
+          $entity->player_respawn_ticks,
+          $entity->user_id === $this->userId
         );
         switch($entity->player_type) {
           case 'wolf':
-            array_push($acc->wolves, new WolfView($entityView, $playerView));
+            array_push(
+              $acc->wolves,
+              new WolfView(
+                $entityView,
+                $playerView,
+                $entity->wolf_bite_ticks,
+                $entity->wolf_petted_ticks
+              ));
             break;
           case 'hunter':
-            array_push($acc->hunters, new HunterView($entityView, $playerView));
+            array_push(
+              $acc->hunters,
+              new HunterView(
+                $entityView,
+                $playerView,
+                $entity->hunter_pet_ticks,
+                $entity->hunter_bited_ticks,
+                $entity->hunter_reload_ticks
+              ));
             break;
         }
         return $acc;
