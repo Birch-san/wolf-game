@@ -12,7 +12,7 @@ class HunterModel extends Model
   protected $returnType = Hunter::class;
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['entity_id', 'reload_ticks'];
+  protected $allowedFields = ['entity_id', 'reload_ticks', 'pet_ticks', 'bited_ticks'];
 
   protected $validationRules    = [];
   protected $validationMessages = [];

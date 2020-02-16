@@ -12,7 +12,7 @@ class WolfModel extends Model
   protected $returnType = Wolf::class;
   protected $useSoftDeletes = false;
 
-  protected $allowedFields = ['entity_id', 'howling'];
+  protected $allowedFields = ['entity_id', 'howling', 'petted_ticks', 'bited_ticks'];
 
   protected $validationRules    = [];
   protected $validationMessages = [];

@@ -159,6 +159,18 @@ class EntityDenormalizedView {
 
   /** @var boolean|null */
   public $wolf_howling;
+
+  /** @var int|null */
+  public $wolf_bite_ticks;
+
+  /** @var int|null */
+  public $wolf_petted_ticks;
+
+  /** @var int|null */
+  public $hunter_pet_ticks;
+
+  /** @var int|null */
+  public $hunter_bited_ticks;
 }
 
 class ActionDenormalizedView {
@@ -206,6 +218,20 @@ class MoveActionRequest extends ActionRequest {
   public $y;
 }
 
+/**
+ * @discriminator type
+ * @discriminatorType bite
+ */
+class BiteActionRequest extends ActionRequest {
+}
+
+/**
+ * @discriminator type
+ * @discriminatorType pet
+ */
+class PetActionRequest extends ActionRequest {
+}
+
 /** @noinspection PhpUnused */
 class World extends BaseController
 {
@@ -249,11 +275,15 @@ class World extends BaseController
     $this->hunterModel = new HunterModel($db);
 
     $this->mapper = new JsonMapper();
-    $this->mapper->arChildClasses[ActionRequest::class] = [MoveActionRequest::class];
+    $this->mapper->arChildClasses[ActionRequest::class] = [
+      MoveActionRequest::class,
+      BiteActionRequest::class,
+      PetActionRequest::class];
   }
 
   /** @noinspection PhpUnused */
   public function _remap(string $method, string ...$params) {
+//    return $this->respond(new ErrorResponse(ErrorCodes::NOT_LOGGED_IN,'Not logged in'), 401);
     if (method_exists($this, $method))
     {
       if (empty($this->userId)) {
@@ -287,9 +317,69 @@ class World extends BaseController
     }
     if ($actionRequest instanceof MoveActionRequest) {
       return $this->actMove($roomName, $actionRequest);
+    } else if ($actionRequest instanceof BiteActionRequest) {
+      return $this->actBite($roomName, $actionRequest);
+    } else if ($actionRequest instanceof PetActionRequest) {
+      return $this->actPet($roomName, $actionRequest);
     }
 
     return $this->respond(new ErrorResponse(ErrorCodes::CLIENT_ERROR,"Action '$actionRequest->type' not supported"), 400);
+  }
+
+  private function actBite(string $roomName, BiteActionRequest $request)
+  {
+    $actionId = IdGenerator::generateId();
+
+    $actQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+insert into actions
+    (id,
+     room_id,
+     user_id,
+     type,
+     submitted_time_client)
+values
+       (?, ?, ?, ?, ?)
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $actQuery->execute(
+      $actionId,
+      $roomName,
+      $this->userId,
+      'bite',
+      $request->time->format('Y-m-d H:i:s.v')
+    );
+
+    return $this->respond(new MessageResponse("Successfully acted"));
+  }
+
+  private function actPet(string $roomName, PetActionRequest $request)
+  {
+    $actionId = IdGenerator::generateId();
+
+    $actQuery = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+insert into actions
+    (id,
+     room_id,
+     user_id,
+     type,
+     submitted_time_client)
+values
+       (?, ?, ?, ?, ?)
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $actQuery->execute(
+      $actionId,
+      $roomName,
+      $this->userId,
+      'pet',
+      $request->time->format('Y-m-d H:i:s.v')
+    );
+
+    return $this->respond(new MessageResponse("Successfully acted"));
   }
 
   private function actMove(string $roomName, MoveActionRequest $request)
@@ -340,34 +430,27 @@ SQL;
 
   /**
    * @param int[][] $terrain
-   * @param string $roomName
-   * @param string $userId
+   * @param EntityDenormalizedView $you
    * @param int $x
    * @param int $y
    * @throws ReflectionException
    */
   private function doMoveAct(
     array &$terrain,
-    string $roomName,
-    string $userId,
+    EntityDenormalizedView $you,
     int $x,
     int $y) {
-    /** @var Entity|null $player */
-    $player = $this->entityModel
-      ->where('room_id', $roomName)
-      ->where('user_id', $userId)
-      ->where('type', 'player')
-      ->first();
-    if (is_null($player)) {
-      return;
+    if ($you->player_type === 'wolf') {
+      if ($you->wolf_petted_ticks > 0) {
+        return;
+      }
+    } else if ($you->player_type === 'hunter') {
+      if ($you->hunter_bited_ticks > 0) {
+        return;
+      }
     }
-    $proposedX = $player->pos_x + $x;
-    $proposedY = $player->pos_y + $y;
-//    log_message('info', 'xDelta {x}, yDelta {y}', [ 'x' => $x, 'y' => $y ]);
-//    log_message('info', 'player {x}, player {y}', [ 'x' => $player->pos_x, 'y' => $player->pos_y ]);
-//    log_message('info', 'proposed {x}, proposed {y}', [ 'x' => $proposedX, 'y' => $proposedY ]);
-//    log_message('info', 'terrain {terrain}', [ 'terrain' => var_export($terrain, true) ]);
-//    log_message('info', 'terrainCoord {coord}', [ 'coord' => $terrain[$proposedY][$proposedX] ]);
+    $proposedX = $you->pos_x + $x;
+    $proposedY = $you->pos_y + $y;
     if ($x > 1
       || $x < -1
       || $y > 1
@@ -380,9 +463,74 @@ SQL;
       || $terrain[$proposedY][$proposedX] !== 0){
       return;
     }
-    $player->pos_x = $proposedX;
-    $player->pos_y = $proposedY;
-    $this->entityModel->save($player);
+    $this->entityModel->update($you->id, [
+      'pos_x' => $proposedX,
+      'pos_y' => $proposedY,
+    ]);
+  }
+
+  /**
+   * @param EntityDenormalizedView $you
+   * @param EntityDenormalizedView[] $huntersWhereYouAt
+   * @throws ReflectionException
+   */
+  private function doBiteAct(
+    EntityDenormalizedView $you,
+    array $huntersWhereYouAt
+  ) {
+    if ($you->player_type !== 'wolf') {
+      return;
+    }
+    if (!count($huntersWhereYouAt)) {
+      return;
+    }
+    $this->db->query(<<<SQL
+update players p
+set p.score = p.score + ?
+where p.entity_id = ?
+SQL
+      , [count($huntersWhereYouAt), $you->id]);
+    $this->wolfModel->update($you->id, [
+      'bite_ticks' => 2,
+    ]);
+    $this->db->query(<<<SQL
+update hunters h
+set h.bited_ticks = ?
+where h.entity_id IN ?
+SQL
+      , [2, array_column($huntersWhereYouAt, 'id')]);
+  }
+
+  /**
+   * @param EntityDenormalizedView $you
+   * @param EntityDenormalizedView[] $wolvesWhereYouAt
+   * @throws ReflectionException
+   */
+  private function doPetAct(
+    EntityDenormalizedView $you,
+    array $wolvesWhereYouAt
+  ) {
+    if ($you->player_type !== 'hunter') {
+      return;
+    }
+    if (!count($wolvesWhereYouAt)) {
+      return;
+    }
+    $this->db->query(<<<SQL
+update players p
+set p.score = p.score + 1
+where p.entity_id IN ?
+SQL
+      , [array_column($wolvesWhereYouAt, 'id') + [$you->id]]);
+    $this->db->query(<<<SQL
+update wolves w
+set w.petted_ticks = ?
+where w.entity_id IN ?
+SQL
+      , [2, array_column($wolvesWhereYouAt, 'id')]);
+    $this->hunterModel->update($you->id, [
+      'pet_ticks' => 2,
+    ]);
   }
 
   private function updateWorld(string $roomName)
@@ -502,16 +650,108 @@ SQL;
     /** @var ActionDenormalizedView[]|null $actions */
     $actions = $getActionsResults->getCustomResultObject(ActionDenormalizedView::class);
 
+    /** @var EntityDenormalizedView[] $entities */
+    $entities = $this->getEntitiesDenormalized($roomName) ?: [];
+
+    $hunters = array_filter($entities, function(&$entity) {
+      return $entity->player_type === 'hunter';
+    });
+    $wolves = array_filter($entities, function(&$entity) {
+      return $entity->player_type === 'wolf';
+    });
+    $players = $hunters + $wolves;
+
+    if (count($players)) {
+      $this->db->query(<<<SQL
+update players p
+set
+    p.respawn_ticks = greatest(0, p.respawn_ticks - 1)
+where p.entity_id in ?
+SQL
+        , [array_column($players, 'id')]);
+
+      $this->db->query(<<<SQL
+update players p
+set
+    p.alive = 1
+where p.entity_id in ?
+  and p.alive = 0
+  and p.respawn_ticks = 0
+SQL
+        , [array_column($players, 'id')]);
+    }
+
+    if (count($hunters)) {
+      $this->db->query(<<<SQL
+update hunters h
+set
+    h.bited_ticks = greatest(0, h.bited_ticks - 1),
+    h.pet_ticks = greatest(0, h.pet_ticks - 1),
+    h.reload_ticks = greatest(0, h.reload_ticks - 1)
+where h.entity_id in ?
+SQL
+      , [array_column($hunters, 'id')]);
+    }
+
+    if (count($wolves)) {
+      $this->db->query(<<<SQL
+update wolves w
+set
+    w.bite_ticks = greatest(0, w.bite_ticks - 1),
+    w.petted_ticks = greatest(0, w.petted_ticks - 1)
+where w.entity_id in ?
+SQL
+        , [array_column($wolves, 'id')]);
+    }
+
     /** @var \App\Entities\Room|null $room */
     $room = $this->roomModel->find($roomName);
     foreach($actions as $action) {
+
+      /** @var EntityDenormalizedView|null $you */
+      $you = null;
+      foreach ($entities as $entity) {
+        if ($entity->user_id === $action->user_id) {
+          $you = $entity;
+        }
+      }
+      if (is_null($you)) {
+        continue;
+      }
+      if (!$you->player_alive) {
+        continue;
+      }
+      /** @var EntityDenormalizedView[] $wolvesWhereYouAt */
+      $wolvesWhereYouAt = [];
+      /** @var EntityDenormalizedView[] $huntersWhereYouAt */
+      $huntersWhereYouAt = [];
+      foreach ($entities as $entity) {
+        if ($entity->pos_x !== $you->pos_x
+        || $entity->pos_y !== $you->pos_y) {
+          continue;
+        }
+        if ($entity->player_type === 'wolf') {
+          array_push($wolvesWhereYouAt, $entity);
+        } else if ($entity->player_type === 'hunter') {
+          array_push($huntersWhereYouAt, $entity);
+        }
+      }
+      // TODO: probably fairer to process actions in order of type
+      // TODO: use updateBatch()
       if ($action->action_type === 'move') {
         $this->doMoveAct(
           $room->terrain,
-          $roomName,
-          $action->user_id,
+          $you,
           $action->move_x,
           $action->move_y);
+      } else if ($action->action_type === 'bite') {
+        $this->doBiteAct(
+          $you,
+          $huntersWhereYouAt);
+      } else if ($action->action_type === 'pet') {
+        $this->doPetAct(
+          $you,
+          $wolvesWhereYouAt);
       }
     }
 
@@ -540,6 +780,63 @@ SQL;
     return $this->respond(new MessageResponse("Successfully updated room '$roomName'"));
   }
 
+  /**
+   * @param string $roomName
+   * @return EntityDenormalizedView[]|null
+   */
+  private function getEntitiesDenormalized(string $roomName): ?array {
+    $query = $this->db->prepare(function($db) {
+      $sql = <<<SQL
+select
+    e.id,
+    e.user_id,
+    e.pos_x,
+    e.pos_y,
+    u.name as user_name,
+    p.alive as player_alive,
+    p.score as player_score,
+    p.respawn_ticks as player_respawn_ticks,
+    p.type as player_type,
+    h1.reload_ticks as hunter_reload_ticks,
+    h1.pet_ticks as hunter_pet_ticks,
+    h1.bited_ticks as hunter_bited_ticks,
+    w1.howling as wolf_howling,
+    w1.bite_ticks as wolf_bite_ticks,
+    w1.petted_ticks as wolf_petted_ticks
+from entities e
+join users u
+  on u.id = e.user_id
+join players p
+  on p.entity_id = e.id
+left outer join
+    (select
+            h.entity_id,
+            h.reload_ticks,
+            h.pet_ticks,
+            h.bited_ticks
+    from hunters h) h1
+    on p.type = 'hunter'
+    and h1.entity_id = e.id
+left outer join
+     (select
+             w.entity_id,
+             w.howling,
+             w.bite_ticks,
+             w.petted_ticks
+      from wolves w) w1
+     on p.type = 'wolf'
+     and w1.entity_id = e.id
+where room_id = ?
+  and e.type = 'player';
+SQL;
+      return (new Query($db))->setQuery($sql);
+    });
+    $results = $query->execute($roomName);
+    /** @var EntityDenormalizedView[]|null $entities */
+    $entities = $results->getCustomResultObject(EntityDenormalizedView::class);
+    return $entities;
+  }
+
   /** @noinspection PhpUnused */
   public function room(string $roomName)
   {
@@ -557,48 +854,8 @@ SQL;
       ), 400);
     }
 
-    $query = $this->db->prepare(function($db) {
-      $sql = <<<SQL
-select
-    e.id,
-    e.user_id,
-    e.pos_x,
-    e.pos_y,
-    u.name as user_name,
-    p.alive as player_alive,
-    p.score as player_score,
-    p.respawn_ticks as player_respawn_ticks,
-    p.type as player_type,
-    h1.reload_ticks as hunter_reload_ticks,
-    w1.howling as wolf_howling
-from entities e
-join users u
-  on u.id = e.user_id
-join players p
-  on p.entity_id = e.id
-left outer join
-    (select
-            h.entity_id,
-            h.reload_ticks
-    from hunters h) h1
-    on p.type = 'hunter'
-    and h1.entity_id = e.id
-left outer join
-     (select
-             w.entity_id,
-             w.howling
-      from wolves w) w1
-     on p.type = 'wolf'
-     and w1.entity_id = e.id
-where room_id = ?
-  and e.type = 'player';
-SQL;
-      return (new Query($db))->setQuery($sql);
-    });
-    $results = $query->execute($roomName);
+    $entities = $this->getEntitiesDenormalized($roomName);
     $this->db->transComplete();
-    /** @var EntityDenormalizedView[]|null $entities */
-    $entities = $results->getCustomResultObject(EntityDenormalizedView::class);
     $response = array_reduce(
       $entities,
       /**
