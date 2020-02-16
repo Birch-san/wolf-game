@@ -24,16 +24,13 @@ class RegisterResponse {
   public $id;
   /** @var string */
   public $name;
-  /** @var bool */
-  public $newUserCreated;
-  /** @var string|null */
+  /** @var string */
   public $password;
 
-  public function __construct(string $id, string $name, bool $newUserCreated, ?string $password)
+  public function __construct(string $id, string $name, string $password)
   {
     $this->id = $id;
     $this->name = $name;
-    $this->newUserCreated = $newUserCreated;
     $this->password = $password;
   }
 }
@@ -137,23 +134,6 @@ SQL;
 	public function register()
   {
     $this->db->transBegin();
-    $id = (string) $this->session->get('id');
-    if (!empty($id)) {
-      $name = (string) $this->session->get('name');
-
-      $touchUserQuery = $this->db->prepare(function($db) {
-        $sql = <<<SQL
-update users u
-set u.last_seen = now(3)
-where u.id = ?
-SQL;
-        return (new Query($db))->setQuery($sql);
-      });
-      $touchUserQuery->execute($id);
-
-      $this->db->transComplete();
-      return $this->respond(new RegisterResponse($id, $name, false, null));
-    }
     $id = IdGenerator::generateId();
 
 //    $names = [
@@ -181,7 +161,7 @@ SQL;
       'name' => $name
     ]);
     $this->db->transComplete();
-    return $this->respond(new RegisterResponse($id, $name, true, $password));
+    return $this->respond(new RegisterResponse($id, $name, $password));
   }
 
   public function logout()
