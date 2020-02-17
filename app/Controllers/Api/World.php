@@ -524,6 +524,9 @@ SQL;
     if (!count($huntersWhereYouAt)) {
       return;
     }
+    if ($you->wolf_bite_ticks > 0) {
+      return;
+    }
     $this->db->query(<<<SQL
 update players p
 set p.score = p.score + ?
@@ -556,12 +559,17 @@ SQL
     if (!count($wolvesWhereYouAt)) {
       return;
     }
+    if ($you->hunter_pet_ticks > 0) {
+      return;
+    }
+    $wolvesPlusMe = array_column($wolvesWhereYouAt, 'id');
+    array_push($wolvesPlusMe, $you->id);
     $this->db->query(<<<SQL
 update players p
 set p.score = p.score + 1
 where p.entity_id IN ?
 SQL
-      , [array_column($wolvesWhereYouAt, 'id') + [$you->id]]);
+      , [$wolvesPlusMe]);
     $this->db->query(<<<SQL
 update wolves w
 set w.petted_ticks = ?
@@ -699,7 +707,9 @@ SQL;
     $wolves = array_filter($entities, function(&$entity) {
       return $entity->player_type === 'wolf';
     });
-    $players = $hunters + $wolves;
+    $players = array_filter($entities, function(&$entity) {
+      return $entity->entity_type === 'player';
+    });
 
     if (count($players)) {
       $this->db->query(<<<SQL
@@ -709,6 +719,20 @@ set
 where p.entity_id in ?
 SQL
         , [array_column($players, 'id')]);
+
+      $this->db->query(<<<SQL
+update players p
+left join hunters h
+  on h.entity_id = p.entity_id
+set
+    p.alive = 0,
+    p.respawn_ticks = 7
+where p.entity_id in ?
+  and p.alive = 1
+  and p.respawn_ticks = 0
+  and h.bited_ticks = 1
+SQL
+        , [array_column($hunters, 'id')]);
 
       $this->db->query(<<<SQL
 update players p
@@ -768,6 +792,9 @@ SQL
       foreach ($entities as $entity) {
         if ($entity->pos_x !== $you->pos_x
         || $entity->pos_y !== $you->pos_y) {
+          continue;
+        }
+        if (!$entity->player_alive) {
           continue;
         }
         if ($entity->player_type === 'wolf') {
